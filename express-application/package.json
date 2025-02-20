@@ -1,0 +1,19 @@
+{
+    "name": "express-application",
+    "version": "1.0.0",
+    "description": "Express application for interacting with all the chaincodes of this project.",
+    "main": "app.js",
+    "dependencies": {
+      "@grpc/grpc-js": "^1.9.7",
+      "@hyperledger/fabric-gateway": "~1.4.0",
+      "axios": "^1.6.7",
+      "express": "^4.18.2",
+      "nodemon": "^3.0.1"
+    },
+    "scripts": {
+      "start": "npx nodemon app.js",
+      "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "author": "Amirreza Sokhankhosh",
+    "license": "ISC"
+  }
