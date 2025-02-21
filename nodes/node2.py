@@ -20,9 +20,11 @@ executer = concurrent.futures.ThreadPoolExecutor(2)
 node = Node(num_nodes=num_nodes, port=port)
 app = Flask(__name__)
 
-@app.route("/round/")
+@app.route("/round/", methods=['POST'])
 def train():
-    executer.submit(node.train)
+    print(request.get_json())
+    path = request.get_json()["modelPath"]
+    executer.submit(node.train, path)
     return "The node has started training."
 
 @app.route("/exit/")

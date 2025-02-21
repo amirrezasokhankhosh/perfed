@@ -5,19 +5,26 @@ const sortKeysRecursive = require("sort-keys-recursive");
 const {Contract} = require("fabric-contract-api");
 
 class TokenTransfer extends Contract {
-    async InitWallets(ctx, numNodes) {
+    async InitWallets(ctx, numNodes, basePrice, scale, totalRewards) {
         for (let i = 0; i < parseInt(numNodes); i++) {
             const wallet = {
                 id: `wallet_${i}`,
                 balance: 0.0
             }
-            await ctx.stub.putState(wallet.id, Buffer(stringify(sortKeysRecursive(wallet))));
+            await ctx.stub.putState(wallet.id, Buffer.from(stringify(sortKeysRecursive(wallet))));
         }
+        const priceInfo = {
+            id: "priceInfo",
+            price: parseFloat(basePrice),
+            scale: parseFloat(scale),
+            totalRewards: parseFloat(totalRewards)
+        }
+        await ctx.stub.putState(priceInfo.id, Buffer.from(stringify(sortKeysRecursive(priceInfo))));
     }
 
-    async WalletExists(ctx, id) {
-        const walletBytes = await ctx.stub.getState(id);
-        return walletBytes && walletBytes.length > 0;
+    async KeyExists(ctx, id) {
+        const valueBytes = await ctx.stub.getState(id);
+        return valueBytes && valueBytes.length > 0;
     }
 
     async CreateWallet(ctx, id, balance) {
@@ -31,15 +38,15 @@ class TokenTransfer extends Contract {
             balance: parseFloat(balance)
         }
 
-        await ctx.stub.putState(wallet.id, Buffer(stringify(sortKeysRecursive(wallet))));
+        await ctx.stub.putState(wallet.id, Buffer.from(stringify(sortKeysRecursive(wallet))));
     }
 
-    async ReadWallet(ctx, id) {
-        const walletBytes = await ctx.stub.getState(id);
-        if (!walletBytes || walletBytes.length === 0) {
+    async ReadKey(ctx, id) {
+        const valueBytes = await ctx.stub.getState(id);
+        if (!valueBytes || valueBytes.length === 0) {
             throw Error(`No wallet exists with id: ${id}.`);
         }
-        return walletBytes.toString()
+        return valueBytes.toString()
     }
 
     async GetAllWallets(ctx) {
@@ -64,7 +71,7 @@ class TokenTransfer extends Contract {
     }
 
     async ProcessTransaction(ctx, id, amount) {
-        const walletString = await this.ReadWallet(ctx, id);
+        const walletString = await this.ReadKey(ctx, id);
         let wallet = JSON.parse(walletString);
 
         const newBalance = wallet.balance + parseFloat(amount);
@@ -75,8 +82,27 @@ class TokenTransfer extends Contract {
             ...wallet,
             balance: newBalance
         };
-        await ctx.stub.putState(id, Buffer(stringify(sortKeysRecursive(wallet))));
+        await ctx.stub.putState(id, Buffer.from(stringify(sortKeysRecursive(wallet))));
         return JSON.stringify(wallet);
+    }
+
+    async ProcessRewards(ctx, rewardsString) {
+        const rewards = JSON.parse(rewardsString);
+        const wallets = []
+        for (const reward of rewards) {
+            const walletString = await this.ProcessTransaction(ctx, reward.walletId, reward.reward)
+            const wallet = JSON.parse(walletString);
+            wallets.push(wallet);
+        }
+        return JSON.stringify(wallets);
+    }
+
+    async UpdatePrice(ctx, newPrice) {
+        const priceInfoString = await this.ReadKey(ctx, "priceInfo");
+        let priceInfo = JSON.parse(priceInfoString);
+        priceInfo.price = parseFloat(newPrice);
+        await ctx.stub.putState(priceInfo.id, Buffer.from(stringify(sortKeysRecursive(priceInfo))));
+        return JSON.stringify(priceInfo)
     }
 }
 

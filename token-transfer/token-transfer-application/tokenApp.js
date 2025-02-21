@@ -7,9 +7,9 @@ class TokenApp {
         this.utf8decoder = new TextDecoder();
     }
 
-    async initWallets(contract, numNodes) {
+    async initWallets(contract, numNodes, basePrice, scale, totalRewards) {
         try {
-            await (await contract).submitTransaction("InitWallets", numNodes);
+            await (await contract).submitTransaction("InitWallets", numNodes, basePrice, scale, totalRewards);
             return "Wallets are successfully initialized.\n";
         } catch (error) {
             console.log(error);
@@ -27,11 +27,11 @@ class TokenApp {
         }
     }
 
-    async readWallet(contract, id) {
+    async readKey(contract, id) {
         try {
-            const walletBytes = await (await contract).evaluateTransaction("ReadWallet", id);
-            const walletString = this.utf8decoder.decode(walletBytes);
-            return JSON.parse(walletString);
+            const valueBytes = await (await contract).evaluateTransaction("ReadKey", id);
+            const valueString = this.utf8decoder.decode(valueBytes);
+            return JSON.parse(valueString);
         } catch (error) {
             console.log(error);
             return error;
@@ -54,6 +54,28 @@ class TokenApp {
             const walletBytes = await (await contract).submitTransaction("ProcessTransaction", id, amount);
             const walletString = this.utf8decoder.decode(walletBytes);
             return JSON.parse(walletString);
+        } catch (error) {
+            console.log(error);
+            return error;
+        }
+    }
+
+    async updatePrice(contract, newPrice) {
+        try {
+            const priceInfoBytes = await (await contract).submitTransaction("UpdatePrice", newPrice);
+            const priceInfoString = this.utf8decoder.decode(priceInfoBytes);
+            return JSON.parse(priceInfoString);
+        } catch (error) {
+            console.log(error);
+            return error;
+        }
+    }
+
+    async processRewards(contract, rewards) {
+        try {
+            const walletsBytes = await (await contract).submitTransaction("ProcessRewards", rewards);
+            const walletsString = this.utf8decoder.decode(walletsBytes);
+            return JSON.parse(walletsString);
         } catch (error) {
             console.log(error);
             return error;

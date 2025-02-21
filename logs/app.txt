@@ -1,3 +1,7 @@
 Server is listening on localhost:3000.
 
-All models are submitted.
+*** ROUND 1 STARTED ***
+Training started.
+*** ROUND 2 STARTED ***
+Training started.
+All ROUNDS COMPLETED.

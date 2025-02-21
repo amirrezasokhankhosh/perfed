@@ -112,8 +112,8 @@ class Node:
         selected_tests = torch.utils.data.Subset(self.test_dataset, test_indexes)
         torch.save(selected_tests, self.tests_path)
 
-    def train(self):
-        self.get_model()
+    def train(self, path):
+        self.model.load_state_dict(torch.load(path))
         self.model.to(self.device)
         optimizer = torch.optim.Adam(self.model.parameters())
         loss_fn = nn.CrossEntropyLoss()
@@ -137,16 +137,6 @@ class Node:
                           "testDataPath" : f"{self.tests_path}"
                       })
         self.round += 1
-
-    def get_model(self):
-        if self.round != 0:
-            res = requests.get("http://localhost:3000/api/model/global/",
-                               json={
-                                   "modelId": f"model_{self.index}",
-                                   "walletId": f"wallet_{self.index}",
-                               })
-            path = json.loads(res.content.decode())["globalModelPath"]
-            self.model.load_state_dict(torch.load(path))
 
     def predict(self):
         pass
