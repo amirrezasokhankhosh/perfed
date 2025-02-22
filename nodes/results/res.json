@@ -1,0 +1,64 @@
+[
+	{
+		"round": 1,
+		"new_model_price": 50.45898675918579,
+		"g_model_loss": 2.2565994262695312,
+		"submits": [
+			{
+				"walletId": "wallet_0",
+				"loss": 2.1003057956695557,
+				"contribution": 0.2021923065185547,
+				"reward": 73.07272640063326
+			},
+			{
+				"walletId": "wallet_1",
+				"loss": 2.099759817123413,
+				"contribution": 0.20273828506469727,
+				"reward": 73.27004419976144
+			},
+			{
+				"walletId": "wallet_2",
+				"loss": 2.0622105598449707,
+				"contribution": 0.24028754234313965,
+				"reward": 86.84042504609108
+			},
+			{
+				"walletId": "wallet_3",
+				"loss": 2.1176159381866455,
+				"contribution": 0.18488216400146484,
+				"reward": 66.81680435351423
+			}
+		]
+	},
+	{
+		"round": 2,
+		"new_model_price": 50.99576473236084,
+		"g_model_loss": 2.2029216289520264,
+		"submits": [
+			{
+				"walletId": "wallet_0",
+				"loss": 2.0673272609710693,
+				"contribution": 0.18927216529846191,
+				"reward": 64.0517438914582
+			},
+			{
+				"walletId": "wallet_1",
+				"loss": 2.0345804691314697,
+				"contribution": 0.22201895713806152,
+				"reward": 75.13361174492421
+			},
+			{
+				"walletId": "wallet_2",
+				"loss": 2.0100998878479004,
+				"contribution": 0.24649953842163086,
+				"reward": 83.41810471417091
+			},
+			{
+				"walletId": "wallet_3",
+				"loss": 2.027893543243408,
+				"contribution": 0.22870588302612305,
+				"reward": 77.39653964944667
+			}
+		]
+	}
+]

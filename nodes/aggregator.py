@@ -24,6 +24,8 @@ class Aggregator:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.loss_fn = nn.CrossEntropyLoss()
         self.num_classes = 10
+        self.curr_round = 0
+        self.results = []
 
     def start(self, submits, prev_price, scale, total_rewards):
         self.combine_test_data(submits)
@@ -33,6 +35,26 @@ class Aggregator:
         new_model_price = self.get_model_price(prev_price, scale)
         submits = self.compute_rewards(submits, total_rewards)
         self.store_on_ledger(new_model_price, submits)
+        self.save_results(new_model_price, submits)
+    
+    def save_results(self, new_model_price, submits):
+        self.curr_round += 1
+        data = {
+            "round" : self.curr_round,
+            "new_model_price" : new_model_price,
+            "g_model_loss" : self.g_model_loss,
+            "submits" : []
+        }
+        for i in range(len(submits)):
+            data["submits"].append({
+                "walletId" : submits[i]["walletId"],
+                "loss" : submits[i]["loss"],
+                "contribution" : submits[i]["contribution"],
+                "reward" : submits[i]["reward"],
+            })
+        self.results.append(data)
+        with open("./results/res.json", "w") as f:
+            f.write(json.dumps(self.results))
         
     def store_on_ledger(self, new_model_price, submits):
         data = {
@@ -108,6 +130,7 @@ class Aggregator:
             submit["model"] = self.load_model(submit["path"])
             loss = self.compute_loss(submit["model"])
             delta = self.prev_g_model_loss - loss
+            submit["loss"] = loss
             submit["contribution"] = max(delta, 0)
         return submits
 
