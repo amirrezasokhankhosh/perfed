@@ -22,7 +22,6 @@ app = Flask(__name__)
 
 @app.route("/round/", methods=['POST'])
 def train():
-    print(request.get_json())
     path = request.get_json()["modelPath"]
     executer.submit(node.train, path)
     return "The node has started training."
@@ -30,6 +29,7 @@ def train():
 @app.route("/exit/")
 def exit_miner():
     os.kill(os.getpid(), signal.SIGTERM)
+
 
 if __name__ == '__main__':
     app.run(host="localhost", port=port)

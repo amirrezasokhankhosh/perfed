@@ -21,8 +21,11 @@ class Aggregator:
         self.cwd = os.path.dirname(__file__)
         self.global_model_path = os.path.join(
             self.cwd, "models", "global.pt")
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = "cpu"
         self.loss_fn = nn.CrossEntropyLoss()
+        self.gamma_max = 0.7
+        self.p = 0.5
+        self.contribution_factor = 0.5
         self.num_classes = 10
         self.curr_round = 0
         self.results = []
@@ -36,6 +39,12 @@ class Aggregator:
         submits = self.compute_rewards(submits, total_rewards)
         self.store_on_ledger(new_model_price, submits)
         self.save_results(new_model_price, submits)
+        self.save_losses(submits)
+
+    def save_losses(self, submits):
+        self.prev_losses = {}
+        for submit in submits:
+            self.prev_losses[submit["walletId"]] = submit["loss"]
     
     def save_results(self, new_model_price, submits):
         self.curr_round += 1
@@ -55,6 +64,7 @@ class Aggregator:
         self.results.append(data)
         with open("./results/res.json", "w") as f:
             f.write(json.dumps(self.results))
+            
         
     def store_on_ledger(self, new_model_price, submits):
         data = {
@@ -72,7 +82,11 @@ class Aggregator:
 
     def compute_rewards(self, submits, total_rewards):
         contributions = [submit["contribution"] for submit in submits]
-        reward_weights = np.array(contributions) / np.sum(contributions)
+        sum_contributions = np.sum(contributions)
+        if sum_contributions == 0 or np.isnan(sum_contributions) or np.isinf(sum_contributions):
+            reward_weights = np.ones_like(contributions) / len(contributions)  # Default uniform distribution
+        else:
+            reward_weights = np.array(contributions) / sum_contributions
         for i in range(len(submits)):
             submits[i]["reward"] = (total_rewards * reward_weights[i]).item()
         return submits
@@ -82,12 +96,18 @@ class Aggregator:
         delta_loss = self.prev_g_model_loss - self.g_model_loss
         return prev_price + scale * delta_loss
 
-    def get_normalization_factors(self, values):
-        return np.array(values) / np.sum(values)
+    def get_gammas(self, values):
+        values = np.array(values, dtype=np.float64)
+        max_val = np.max(values)
+
+        if max_val == 0 or np.isnan(max_val) or np.isinf(max_val):
+            return np.ones_like(values) 
+    
+        return np.minimum(np.power((values/max_val), self.p), self.gamma_max)
+
 
     def update_personalized_models(self, submits):
-        gammas = self.get_normalization_factors(
-            [submit["contribution"] for submit in submits])
+        gammas = self.get_gammas([submit["contribution"] for submit in submits])
         for i in range(len(submits)):
             model_state = submits[i]["model"].state_dict()
             model_params = {key: torch.zeros_like(
@@ -104,12 +124,21 @@ class Aggregator:
             submits[i]["model_path"] = model_path
 
     def softmax(self, values):
-        return np.exp(values) / np.sum(np.exp(values))
+        values = np.array(values, dtype=np.float64)
+        max_val = np.max(values)
+
+        if max_val == 0 or np.isnan(max_val) or np.isinf(max_val):
+            return np.ones_like(values) / len(values)
+
+        values = values - max_val
+        exp_values = np.exp(values)
+        sum_exp = np.sum(exp_values) + 1e-9
+        return exp_values / sum_exp
+
 
     def update_global_model(self, submits):
         self.g_model = Classifier(self.num_classes).to(self.device)
         weights = self.softmax([submit["contribution"] for submit in submits])
-
         model_state = self.g_model.state_dict()
         model_params = {key: torch.zeros_like(
             value, dtype=torch.float32, device="cpu") for key, value in model_state.items()}
@@ -117,11 +146,11 @@ class Aggregator:
             for i, submit in enumerate(submits):
                 submit_model_state = submit["model"].state_dict()
                 for key in model_params:
-                    model_params[key] += weights[i] * \
-                        submit_model_state[key].cpu()
+                    model_params[key] += weights[i] * submit_model_state[key]
 
+        self.g_model = Classifier(self.num_classes).to(self.device)
         self.g_model.load_state_dict(model_params)
-        torch.save(self.g_model.state_dict(), self.global_model_path)
+        torch.save(model_params, self.global_model_path)
 
     def compute_contribution(self, submits):
         self.prev_g_model = self.load_model(self.global_model_path)
@@ -130,6 +159,9 @@ class Aggregator:
             submit["model"] = self.load_model(submit["path"])
             loss = self.compute_loss(submit["model"])
             delta = self.prev_g_model_loss - loss
+            if self.curr_round != 0:
+                delta_local_loss = self.prev_losses[submit["walletId"]] - loss
+                delta = self.contribution_factor * delta + (1 - self.contribution_factor) * delta_local_loss
             submit["loss"] = loss
             submit["contribution"] = max(delta, 0)
         return submits

@@ -4,4 +4,19 @@ Server is listening on localhost:3000.
 Training started.
 *** ROUND 2 STARTED ***
 Training started.
-All ROUNDS COMPLETED.
+*** ROUND 3 STARTED ***
+Training started.
+*** ROUND 4 STARTED ***
+Training started.
+*** ROUND 5 STARTED ***
+Training started.
+*** ROUND 6 STARTED ***
+Training started.
+*** ROUND 7 STARTED ***
+Training started.
+*** ROUND 8 STARTED ***
+Training started.
+*** ROUND 9 STARTED ***
+Training started.
+*** ROUND 10 STARTED ***
+Training started.

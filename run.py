@@ -79,6 +79,7 @@ if __name__ == "__main__":
     
     path = os.path.join(cwd, "nodes", "models", "global.pt")
     print("\nStarting the training process...")
+    time.sleep(5)
     requests.post("http://localhost:3000/api/start/", 
         json = {
             "globalModelPath" : path

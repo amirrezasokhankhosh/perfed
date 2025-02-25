@@ -3,5 +3,13 @@
 [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on http://localhost:8080
 [33mPress CTRL+C to quit[0m
-127.0.0.1 - - [22/Feb/2025 10:42:04] "POST /aggregate/ HTTP/1.1" 200 -
-127.0.0.1 - - [22/Feb/2025 10:43:56] "POST /aggregate/ HTTP/1.1" 200 -
+127.0.0.1 - - [25/Feb/2025 17:03:34] "POST /aggregate/ HTTP/1.1" 200 -
+127.0.0.1 - - [25/Feb/2025 17:03:54] "POST /aggregate/ HTTP/1.1" 200 -
+127.0.0.1 - - [25/Feb/2025 17:04:15] "POST /aggregate/ HTTP/1.1" 200 -
+127.0.0.1 - - [25/Feb/2025 17:04:35] "POST /aggregate/ HTTP/1.1" 200 -
+127.0.0.1 - - [25/Feb/2025 17:04:55] "POST /aggregate/ HTTP/1.1" 200 -
+127.0.0.1 - - [25/Feb/2025 17:05:15] "POST /aggregate/ HTTP/1.1" 200 -
+127.0.0.1 - - [25/Feb/2025 17:05:35] "POST /aggregate/ HTTP/1.1" 200 -
+127.0.0.1 - - [25/Feb/2025 17:05:55] "POST /aggregate/ HTTP/1.1" 200 -
+127.0.0.1 - - [25/Feb/2025 17:06:15] "POST /aggregate/ HTTP/1.1" 200 -
+127.0.0.1 - - [25/Feb/2025 17:06:35] "POST /aggregate/ HTTP/1.1" 200 -

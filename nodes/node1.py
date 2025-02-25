@@ -22,7 +22,6 @@ app = Flask(__name__)
 
 @app.route("/round/", methods=['POST'])
 def train():
-    print(request.get_json())
     path = request.get_json()["modelPath"]
     executer.submit(node.train, path)
     return "The node has started training."

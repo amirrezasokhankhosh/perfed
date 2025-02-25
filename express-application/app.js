@@ -74,7 +74,7 @@ const contractToken = InitConnection("main", "tokenCC");
 const contractModel = InitConnection("main", "modelCC");
 
 const numNodes = 4;
-const rounds = 2;
+const rounds = 20;
 let currentRound = 0;
 const basePrice = 50;
 const scale = 10;
