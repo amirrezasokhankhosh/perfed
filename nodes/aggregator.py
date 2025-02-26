@@ -20,9 +20,9 @@ class Aggregator:
         self.global_model_path = os.path.join(self.cwd, "models", "global.pt")
         self.device = "cpu"
         self.loss_fn = nn.CrossEntropyLoss()
-        self.gamma_max = 0.7       # cap on gamma
-        self.p = 0.5               # exponent for nonlinear scaling of gamma
-        self.contribution_factor = 0.5  # blend factor between global gap and local improvement
+        self.gamma_max = 0.7
+        self.p = 0.5
+        self.contribution_factor = 0.5
         self.num_classes = 10
         self.curr_round = 0
         self.results = {}
@@ -40,7 +40,6 @@ class Aggregator:
         self.save_losses(submits)
 
     def save_losses(self, submits):
-        # Save current losses per wallet for composite contribution computation next round.
         for submit in submits:
             self.prev_losses[submit["walletId"]] = submit["loss"]
     
@@ -61,7 +60,6 @@ class Aggregator:
                 "contribution": submit["contribution"],
                 "reward": submit["reward"],
             })
-        # Append to results and save to file.
         if self.curr_round == 1:
             self.results = []
         self.results.append(data)
@@ -82,9 +80,8 @@ class Aggregator:
         requests.post("http://localhost:3000/api/aggregator/", json=data)
 
     def compute_rewards(self, submits, total_rewards):
-        # Apply a smoothing transformation (log1p) to contributions
         contributions = np.array([submit["contribution"] for submit in submits])
-        smoothed = np.log1p(contributions)  # log(1+x) helps boost small differences
+        smoothed = np.log1p(contributions)
         sum_smoothed = np.sum(smoothed)
         if sum_smoothed == 0 or np.isnan(sum_smoothed) or np.isinf(sum_smoothed):
             reward_weights = np.ones_like(contributions) / len(contributions)
@@ -104,13 +101,10 @@ class Aggregator:
         max_val = np.max(values)
         if max_val == 0 or np.isnan(max_val) or np.isinf(max_val):
             return np.ones_like(values)
-        # Apply nonlinear scaling and then cap gamma values.
         return np.minimum(np.power((values / max_val), self.p), self.gamma_max)
 
     def update_personalized_models(self, submits):
         gammas = self.get_gammas([submit["contribution"] for submit in submits])
-        # Optionally, log gammas here for debugging.
-        # print("Gammas:", gammas)
         for i in range(len(submits)):
             model_state = submits[i]["model"].state_dict()
             model_params = {key: torch.zeros_like(value, dtype=torch.float32, device="cpu") 
@@ -136,7 +130,6 @@ class Aggregator:
         return exp_values / sum_exp
 
     def update_global_model(self, submits):
-        # Aggregate client models into a new global model.
         self.g_model = Classifier(self.num_classes).to(self.device)
         weights = self.softmax([submit["contribution"] for submit in submits])
         model_state = self.g_model.state_dict()
@@ -151,17 +144,14 @@ class Aggregator:
         torch.save(model_params, self.global_model_path)
 
     def compute_contribution(self, submits):
-        # Load the previous global model and compute its loss.
         self.prev_g_model = self.load_model(self.global_model_path)
         self.prev_g_model_loss = self.compute_loss(self.prev_g_model)
         for submit in submits:
-            # Load the client's model from its provided path.
             submit["model"] = self.load_model(submit["path"])
             loss = self.compute_loss(submit["model"])
             delta_gap = self.prev_g_model_loss - loss
             if self.curr_round != 0:
                 delta_local_loss = self.prev_losses.get(submit["walletId"], self.prev_g_model_loss) - loss
-                # Composite contribution: blend global gap and local improvement.
                 delta = self.contribution_factor * delta_gap + (1 - self.contribution_factor) * delta_local_loss
                 submit["delta_local_loss"] = delta_local_loss
             else:
