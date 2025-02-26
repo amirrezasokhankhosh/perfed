@@ -20,3 +20,24 @@ Training started.
 Training started.
 *** ROUND 10 STARTED ***
 Training started.
+*** ROUND 11 STARTED ***
+Training started.
+*** ROUND 12 STARTED ***
+Training started.
+*** ROUND 13 STARTED ***
+Training started.
+*** ROUND 14 STARTED ***
+Training started.
+*** ROUND 15 STARTED ***
+Training started.
+*** ROUND 16 STARTED ***
+Training started.
+*** ROUND 17 STARTED ***
+Training started.
+*** ROUND 18 STARTED ***
+Training started.
+*** ROUND 19 STARTED ***
+Training started.
+*** ROUND 20 STARTED ***
+Training started.
+All ROUNDS COMPLETED.

@@ -12,23 +12,21 @@ from model import Classifier
 from flask import Flask, request
 from torch.utils.data import DataLoader
 
-
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 
 class Aggregator:
     def __init__(self):
         self.cwd = os.path.dirname(__file__)
-        self.global_model_path = os.path.join(
-            self.cwd, "models", "global.pt")
+        self.global_model_path = os.path.join(self.cwd, "models", "global.pt")
         self.device = "cpu"
         self.loss_fn = nn.CrossEntropyLoss()
-        self.gamma_max = 0.7
-        self.p = 0.5
-        self.contribution_factor = 0.5
+        self.gamma_max = 0.7       # cap on gamma
+        self.p = 0.5               # exponent for nonlinear scaling of gamma
+        self.contribution_factor = 0.5  # blend factor between global gap and local improvement
         self.num_classes = 10
         self.curr_round = 0
-        self.results = []
+        self.results = {}
+        self.prev_losses = {}
 
     def start(self, submits, prev_price, scale, total_rewards):
         self.combine_test_data(submits)
@@ -42,51 +40,56 @@ class Aggregator:
         self.save_losses(submits)
 
     def save_losses(self, submits):
-        self.prev_losses = {}
+        # Save current losses per wallet for composite contribution computation next round.
         for submit in submits:
             self.prev_losses[submit["walletId"]] = submit["loss"]
     
     def save_results(self, new_model_price, submits):
         self.curr_round += 1
         data = {
-            "round" : self.curr_round,
-            "new_model_price" : new_model_price,
-            "g_model_loss" : self.g_model_loss,
-            "submits" : []
+            "round": self.curr_round,
+            "new_model_price": new_model_price,
+            "g_model_loss": self.g_model_loss,
+            "submits": []
         }
-        for i in range(len(submits)):
+        for submit in submits:
             data["submits"].append({
-                "walletId" : submits[i]["walletId"],
-                "loss" : submits[i]["loss"],
-                "contribution" : submits[i]["contribution"],
-                "reward" : submits[i]["reward"],
+                "walletId": submit["walletId"],
+                "loss": submit["loss"],
+                "delta_local_loss" : submit["delta_local_loss"],
+                "delta_gap" : submit["delta_gap"],
+                "contribution": submit["contribution"],
+                "reward": submit["reward"],
             })
+        # Append to results and save to file.
+        if self.curr_round == 1:
+            self.results = []
         self.results.append(data)
         with open("./results/res.json", "w") as f:
-            f.write(json.dumps(self.results))
+            f.write(json.dumps(self.results, indent=2))
             
-        
     def store_on_ledger(self, new_model_price, submits):
         data = {
-            "newPrice" : new_model_price,
-            "submits" : []
+            "newPrice": new_model_price,
+            "submits": []
         }
-        for i in range(len(submits)):
+        for submit in submits:
             data["submits"].append({
-                "walletId" : submits[i]["walletId"],
-                "reward" : submits[i]["reward"],
-                "modelPath" : submits[i]["model_path"]
+                "walletId": submit["walletId"],
+                "reward": submit["reward"],
+                "modelPath": submit["model_path"]
             })
-        requests.post("http://localhost:3000/api/aggregator/",
-                      json=data)
+        requests.post("http://localhost:3000/api/aggregator/", json=data)
 
     def compute_rewards(self, submits, total_rewards):
-        contributions = [submit["contribution"] for submit in submits]
-        sum_contributions = np.sum(contributions)
-        if sum_contributions == 0 or np.isnan(sum_contributions) or np.isinf(sum_contributions):
-            reward_weights = np.ones_like(contributions) / len(contributions)  # Default uniform distribution
+        # Apply a smoothing transformation (log1p) to contributions
+        contributions = np.array([submit["contribution"] for submit in submits])
+        smoothed = np.log1p(contributions)  # log(1+x) helps boost small differences
+        sum_smoothed = np.sum(smoothed)
+        if sum_smoothed == 0 or np.isnan(sum_smoothed) or np.isinf(sum_smoothed):
+            reward_weights = np.ones_like(contributions) / len(contributions)
         else:
-            reward_weights = np.array(contributions) / sum_contributions
+            reward_weights = smoothed / sum_smoothed
         for i in range(len(submits)):
             submits[i]["reward"] = (total_rewards * reward_weights[i]).item()
         return submits
@@ -99,70 +102,73 @@ class Aggregator:
     def get_gammas(self, values):
         values = np.array(values, dtype=np.float64)
         max_val = np.max(values)
-
         if max_val == 0 or np.isnan(max_val) or np.isinf(max_val):
-            return np.ones_like(values) 
-    
-        return np.minimum(np.power((values/max_val), self.p), self.gamma_max)
-
+            return np.ones_like(values)
+        # Apply nonlinear scaling and then cap gamma values.
+        return np.minimum(np.power((values / max_val), self.p), self.gamma_max)
 
     def update_personalized_models(self, submits):
         gammas = self.get_gammas([submit["contribution"] for submit in submits])
+        # Optionally, log gammas here for debugging.
+        # print("Gammas:", gammas)
         for i in range(len(submits)):
             model_state = submits[i]["model"].state_dict()
-            model_params = {key: torch.zeros_like(
-                value, dtype=torch.float32, device="cpu") for key, value in model_state.items()}
+            model_params = {key: torch.zeros_like(value, dtype=torch.float32, device="cpu") 
+                            for key, value in model_state.items()}
             g_model_state = self.g_model.state_dict()
             with torch.no_grad():
                 for key in model_params:
-                    model_params[key] = (
-                        1 - gammas[i]) * model_state[key].cpu() + gammas[i] * g_model_state[key].cpu()
+                    model_params[key] = ((1 - gammas[i]) * model_state[key].cpu() +
+                                         gammas[i] * g_model_state[key].cpu())
             submits[i]["model"].load_state_dict(model_params)
-            model_path = os.path.join(
-                self.cwd, "models", f"g_model_{i}.pt")
+            model_path = os.path.join(self.cwd, "models", f"g_model_{i}.pt")
             torch.save(submits[i]["model"].state_dict(), model_path)
             submits[i]["model_path"] = model_path
 
     def softmax(self, values):
         values = np.array(values, dtype=np.float64)
         max_val = np.max(values)
-
         if max_val == 0 or np.isnan(max_val) or np.isinf(max_val):
             return np.ones_like(values) / len(values)
-
         values = values - max_val
         exp_values = np.exp(values)
         sum_exp = np.sum(exp_values) + 1e-9
         return exp_values / sum_exp
 
-
     def update_global_model(self, submits):
+        # Aggregate client models into a new global model.
         self.g_model = Classifier(self.num_classes).to(self.device)
         weights = self.softmax([submit["contribution"] for submit in submits])
         model_state = self.g_model.state_dict()
-        model_params = {key: torch.zeros_like(
-            value, dtype=torch.float32, device="cpu") for key, value in model_state.items()}
+        model_params = {key: torch.zeros_like(value, dtype=torch.float32, device="cpu") 
+                        for key, value in model_state.items()}
         with torch.no_grad():
             for i, submit in enumerate(submits):
                 submit_model_state = submit["model"].state_dict()
                 for key in model_params:
                     model_params[key] += weights[i] * submit_model_state[key]
-
-        self.g_model = Classifier(self.num_classes).to(self.device)
         self.g_model.load_state_dict(model_params)
         torch.save(model_params, self.global_model_path)
 
     def compute_contribution(self, submits):
+        # Load the previous global model and compute its loss.
         self.prev_g_model = self.load_model(self.global_model_path)
         self.prev_g_model_loss = self.compute_loss(self.prev_g_model)
         for submit in submits:
+            # Load the client's model from its provided path.
             submit["model"] = self.load_model(submit["path"])
             loss = self.compute_loss(submit["model"])
-            delta = self.prev_g_model_loss - loss
+            delta_gap = self.prev_g_model_loss - loss
             if self.curr_round != 0:
-                delta_local_loss = self.prev_losses[submit["walletId"]] - loss
-                delta = self.contribution_factor * delta + (1 - self.contribution_factor) * delta_local_loss
-            submit["loss"] = loss
+                delta_local_loss = self.prev_losses.get(submit["walletId"], self.prev_g_model_loss) - loss
+                # Composite contribution: blend global gap and local improvement.
+                delta = self.contribution_factor * delta_gap + (1 - self.contribution_factor) * delta_local_loss
+                submit["delta_local_loss"] = delta_local_loss
+            else:
+                submit["delta_local_loss"] = 0
+                delta = delta_gap
+            submit["loss"] = loss 
+            submit["delta_gap"] = delta_gap
             submit["contribution"] = max(delta, 0)
         return submits
 
@@ -172,8 +178,7 @@ class Aggregator:
             dataset = torch.load(submit["testDataPath"])
             datasets.append(dataset)
         self.test_dataset = torch.utils.data.ConcatDataset(datasets)
-        self.test_dataloader = DataLoader(
-            self.test_dataset, batch_size=len(self.test_dataset))
+        self.test_dataloader = DataLoader(self.test_dataset, batch_size=len(self.test_dataset))
 
     def load_model(self, path):
         model = Classifier(self.num_classes).to(self.device)
@@ -203,8 +208,6 @@ def aggregate():
     scale = request.get_json()["scale"]
     total_rewards = request.get_json()["totalRewards"]
     aggregator.start(submits, prev_price, scale, total_rewards)
-    # executer.submit(aggregator.start, submits,
-    #                 prev_price, scale, total_rewards)
     return "aggregation started."
 
 
