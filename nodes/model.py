@@ -1,24 +1,25 @@
 import torch
+import torchvision
 from torch import nn
 
-class Classifier(nn.Module):
-    def __init__(self, num_classes):
-        super().__init__()
-        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.relu = nn.ReLU()
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.fc1 = nn.Linear(64 * 7 * 7, 128)
-        self.fc2 = nn.Linear(128, num_classes)
-        self.relu = nn.ReLU()
+# class Classifier(nn.Module):
+#     def __init__(self, num_classes):
+#         super().__init__()
+#         self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
+#         self.pool = nn.MaxPool2d(2, 2)
+#         self.relu = nn.ReLU()
+#         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+#         self.pool = nn.MaxPool2d(2, 2)
+#         self.fc1 = nn.Linear(64 * 7 * 7, 128)
+#         self.fc2 = nn.Linear(128, num_classes)
+#         self.relu = nn.ReLU()
 
-    def forward(self, data):
-        x = self.pool(self.relu(self.conv1(data)))
-        x = self.pool(self.relu(self.conv2(x)))  # Conv2 -> ReLU -> Pool
-        x = x.view(-1, 64 * 7 * 7)              # Flatten
-        x = self.relu(self.fc1(x))               # Fully connected -> ReLU
-        return self.fc2(x) 
+#     def forward(self, data):
+#         x = self.pool(self.relu(self.conv1(data)))
+#         x = self.pool(self.relu(self.conv2(x)))  # Conv2 -> ReLU -> Pool
+#         x = x.view(-1, 64 * 7 * 7)              # Flatten
+#         x = self.relu(self.fc1(x))               # Fully connected -> ReLU
+#         return self.fc2(x) 
 
 # class Classifier(nn.Module):
 #     def __init__(self, num_classes):
@@ -39,7 +40,7 @@ class Classifier(nn.Module):
 #         self.bn6 = nn.BatchNorm2d(128)
 
 #         self.mp = nn.MaxPool2d(kernel_size=2, stride=2)
-#         self.flatten = nn.Flatten()
+#         self.flatten = Classifier(10)nn.Flatten()
 #         self.dropout = nn.Dropout(0.5)
 #         self.fc = nn.Linear(128 * 4 * 4, num_classes)
 #         self.relu = nn.ReLU()
@@ -61,6 +62,19 @@ class Classifier(nn.Module):
 #         x = self.flatten(x)
 #         x = self.dropout(x)
 #         return self.fc(x)
+
+
+class ResNet18Classifier(nn.Module):
+    def __init__(self, num_classes=10):
+        super().__init__()
+
+        self.resnet = torchvision.models.resnet18(pretrained=False)
+        self.resnet.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+        self.resnet.maxpool = nn.Identity()
+        self.resnet.fc = nn.Linear(self.resnet.fc.in_features, num_classes)
+
+    def forward(self, x):
+        return self.resnet(x)
     
-model = Classifier(10)
+model = ResNet18Classifier(10)
 torch.save(model.state_dict(), "./models/global.pt")

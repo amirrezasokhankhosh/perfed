@@ -8,7 +8,7 @@ import threading
 import numpy as np
 from torch import nn
 import concurrent.futures
-from model import Classifier
+from model import ResNet18Classifier
 from flask import Flask, request
 from torch.utils.data import DataLoader
 
@@ -130,7 +130,7 @@ class Aggregator:
         return exp_values / sum_exp
 
     def update_global_model(self, submits):
-        self.g_model = Classifier(self.num_classes).to(self.device)
+        self.g_model = ResNet18Classifier(self.num_classes).to(self.device)
         weights = self.softmax([submit["contribution"] for submit in submits])
         model_state = self.g_model.state_dict()
         model_params = {key: torch.zeros_like(value, dtype=torch.float32, device="cpu") 
@@ -171,7 +171,7 @@ class Aggregator:
         self.test_dataloader = DataLoader(self.test_dataset, batch_size=len(self.test_dataset))
 
     def load_model(self, path):
-        model = Classifier(self.num_classes).to(self.device)
+        model = ResNet18Classifier(self.num_classes).to(self.device)
         model.load_state_dict(torch.load(path))
         return model
 
